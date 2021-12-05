@@ -103,14 +103,14 @@ class Analyzer():
         printString = printString + 'Data: '
         if self. _data_display_mode == DATA_DISPLAY_MODES[1]:
             for byte in msg.data:
-                if not data_changed:
+                if not data_changed or not recieved_since_last_print:
                     printString = printString + Style.DIM
                 printString = printString + '{0:3d}'.format(byte) + Style.RESET_ALL + " "
 
             printString = printString + '    '
         else:
             for byte in msg.data:
-                if not data_changed:
+                if not data_changed or not recieved_since_last_print:
                     printString = printString + Style.DIM
                 printString = printString + '{0:02X}'.format(byte) + Style.RESET_ALL + " "
             printString = printString + '    '
