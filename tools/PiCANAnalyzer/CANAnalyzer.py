@@ -3,11 +3,11 @@ import time
 import can
 from colorama import Fore, Back, Style
 
+
 ID_DISPLAY_MODES = ['hex', 'dec']
 DATA_DISPLAY_MODES = ['hex', 'dec']
 TIMESTAMP_DISPLAY_MODES = ['absolute', 'delta']
-
-
+MESSAGE_SORTING_MODES = ['none', 'id', 'bus', 'bus_then_id']
 
 
 class Analyzer():
@@ -18,6 +18,7 @@ class Analyzer():
         id_display_mode = 0,
         data_display_mode = 0,
         timestamp_display_mode = 0,
+        message_sorting_mode = 3,
         print_msg_timeout = 10.0
         ):
 
@@ -28,6 +29,7 @@ class Analyzer():
         self._id_display_mode = ID_DISPLAY_MODES[id_display_mode]
         self._data_display_mode = DATA_DISPLAY_MODES[data_display_mode]
         self._timestamp_display_mode = TIMESTAMP_DISPLAY_MODES[timestamp_display_mode]
+        self._message_sorting_mode = MESSAGE_SORTING_MODES[message_sorting_mode]
         self._print_msg_timeout = print_msg_timeout
 
         for bus in busses:
@@ -56,9 +58,8 @@ class Analyzer():
         self._msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)] = {'last_recieved_timestamp': msg.timestamp, 'msg': msg, 'last_dt': dt, 'recieved_since_last_print': True,
             'data_changed': data_changed}
         
-        #self.print_msg(msg, dt)
 
-    def print_all_msgs(self):
+    def print_data(self):
 
         self._clear_terminal()
 
@@ -67,11 +68,11 @@ class Analyzer():
         print()
 
         for msg_bus_and_id in self._sorted_msgs(3):
-            self.print_msg(msg_bus_and_id)
+            self._print_msg(msg_bus_and_id)
         
                 
 
-    def print_msg(self, msg_bus_and_id):
+    def _print_msg(self, msg_bus_and_id):
 
         msg = self._msgs_dicts[msg_bus_and_id]['msg']
         dt = self._msgs_dicts[msg_bus_and_id]['last_dt']
