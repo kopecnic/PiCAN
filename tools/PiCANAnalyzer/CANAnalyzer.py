@@ -38,17 +38,17 @@ class Analyzer():
             self._listeners.append(listener)
             self._notifiers.append(notifier)
 
-            self._bus_msgs_dicts[bus.channel] = {}
+            self._msgs_dicts = {}
 
     def _on_msg_recieve(self, msg):
 
         dt = 0.0
 
-        if msg.arbitration_id in self._bus_msgs_dicts[msg.channel]:
-            last_recieved_timestamp = self._bus_msgs_dicts[msg.channel][msg.arbitration_id]['last_recieved_timestamp']
+        if (msg.channel + ":" + str(msg.arbitration_id)) in self._msgs_dicts:
+            last_recieved_timestamp = self._msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)]['last_recieved_timestamp']
             dt = msg.timestamp - last_recieved_timestamp
         
-        self._bus_msgs_dicts[msg.channel][msg.arbitration_id] = {'last_recieved_timestamp': msg.timestamp, 'msg': msg, 'last_dt': dt}
+        self._msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)] = {'last_recieved_timestamp': msg.timestamp, 'msg': msg, 'last_dt': dt}
         
         #self.print_msg(msg, dt)
 
@@ -62,12 +62,11 @@ class Analyzer():
 
         current_time = time.time()
 
-        for bus_msg_dict in self._sorted_busses_dict(0):
-            for msg_id in self._sorted_msgs_dict(bus_msg_dict, 1):
-                if (current_time - self._bus_msgs_dicts[bus_msg_dict][msg_id]['last_recieved_timestamp']) < self._print_msg_timeout:
-                    msg = self._bus_msgs_dicts[bus_msg_dict][msg_id]['msg']
-                    dt = self._bus_msgs_dicts[bus_msg_dict][msg_id]['last_dt']
-                    self.print_msg(msg, dt)
+        for msg_bus_and_id in self._sorted_msgs(3):
+            if (current_time - self._msgs_dicts[msg_bus_and_id]['last_recieved_timestamp']) < self._print_msg_timeout:
+                msg = self._msgs_dicts[msg_bus_and_id]['msg']
+                dt = self._msgs_dicts[msg_bus_and_id]['last_dt']
+                self.print_msg(msg, dt)
         
                 
 
@@ -104,14 +103,13 @@ class Analyzer():
     
         print('\033[H\033[J') 
 
-    def _sorted_msgs_dict(self, bus, mode):
+    def _sorted_msgs(self, mode):
         if mode == 0:
-            return self._bus_msgs_dicts[bus]
+            return self._msgs_dicts
         elif mode == 1:
-            return sorted(self._bus_msgs_dicts[bus].keys())
+            return sorted(self._msgs_dicts, key=lambda msg_bus_and_id: msg_bus_and_id.split(":")[-1])
+        elif mode == 2:
+            return sorted(self._msgs_dicts, key=lambda msg_bus_and_id: msg_bus_and_id.split(":")[0])
+        elif mode == 3:
+            return sorted(self._msgs_dicts, key=lambda msg_bus_and_id: (msg_bus_and_id.split(":")[0], msg_bus_and_id.split(":")[-1]))
 
-    def _sorted_busses_dict(self, mode):
-        if mode == 0:
-            return self._bus_msgs_dicts
-        elif mode == 1:
-            return sorted(self._bus_msgs_dicts.keys())
