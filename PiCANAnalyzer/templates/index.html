@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"></script>
+  <head>
+    <meta charset="utf-8">
+    <title>My test page</title>
+    <link rel="stylesheet" href='/static/style.css' />
+  </head>
+    
+  <div id="clock1" class="clock" style="text-align:center;"></div>
+  <div style="text-align:center;">
+    <img src="{{url_for('static', filename='fsae-logo.png')}}" alt="My test image" allign="middle">
+  </div>
+  <div class="container" style="display: flex">
+    <div class="box" style="width: 50%; flex-grow: 1; height: 500px;">
+      <div id="test_id" style="text-align:center;"></div>
+      <div id="can_data" style="text-align:left;"></div>
+    </div>
+  </div>
+
+  <script type="text/javascript">
+
+    function digitalClock()
+    {
+      var date=new Date();
+
+      var h=date.getHours();
+      var m=date.getMinutes();
+      var s=date.getSeconds();
+      var ms=date.getMilliseconds();
+
+      var separator = ":"
+
+      document.getElementById("clock1").innerHTML=h+separator+m+separator+s+separator+ms;
+
+      setTimeout(digitalClock, 1000);
+    }
+
+    digitalClock();
+
+  </script>
+
+  <script type="text/javascript">
+    var socket = io();
+
+    function test() 
+    {
+      socket.emit('display_test');
+
+      setTimeout(test, 1000);
+    }
+
+    socket.on('test_response', function(data)
+    {
+      document.getElementById("test_id").innerHTML=data["time"] + ":" + data["text"];
+      var canData=data['canData'];
+
+      var printText = "";
+
+      for(i=0; i<canData.length; i++)
+      {
+        printText = printText+canData[i]+'<br>';
+      }
+
+      document.getElementById("can_data").innerHTML=printText;
+      
+    });
+
+    test();
+
+  </script>
+
+</html>
