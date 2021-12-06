@@ -3,15 +3,20 @@ import time
 import can
 from colorama import Fore, Back, Style
 
-
+#constants
 ID_DISPLAY_MODES = ['hex', 'dec']
 DATA_DISPLAY_MODES = ['hex', 'dec']
 TIMESTAMP_DISPLAY_MODES = ['absolute', 'delta']
 MESSAGE_SORTING_MODES = ['none', 'id', 'bus', 'bus_then_id']
 
+"""
+Class that describes an CANAnalyzer. Used for reading and transmitting CAN messages on CAN busses.
+"""
+class CANAnalyzer():
 
-class Analyzer():
-
+    """
+    Initializes a CANAnalyzer object
+    """
     def __init__(
         self, 
         busses=[],

@@ -6,7 +6,7 @@ bus0 = can.interface.Bus(bustype='socketcan', channel='can0', bitrate=1000000) #
 bus1 = can.interface.Bus(bustype='socketcan', channel='can1', bitrate=1000000) #setup bus 2
 
 #initialize Analyzer object
-analyzer = CANAnalyzer.Analyzer(busses=[bus0, bus1], id_display_mode=0, data_display_mode=0, timestamp_display_mode=1) 
+analyzer = CANAnalyzer.CANAnalyzer(busses=[bus0, bus1], id_display_mode=0, data_display_mode=0, timestamp_display_mode=1) 
 
 if __name__ == '__main__':
 
