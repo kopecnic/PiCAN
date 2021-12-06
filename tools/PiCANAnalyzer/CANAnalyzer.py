@@ -16,6 +16,14 @@ class CANAnalyzer():
 
     """
     Initializes a CANAnalyzer object
+
+    @params
+    busses: a list of python-can can.interface.Bus objects
+    id_display_mode: the mode to display can ids in. modes are listed in constants
+    data_display_mode: the mode to display message data in. modes are listed in constants
+    timestamp_display_modes: the mode to display timestamps in. modes are listed in constants
+    message_sorting_mode: the mode to sort messages for display. modes are listed in constants
+    print_msg_timeout: timeout for displaying messages in seconds
     """
     def __init__(
         self, 
@@ -27,117 +35,205 @@ class CANAnalyzer():
         print_msg_timeout = 10.0
         ):
 
-        self._busses = busses
-        self._listeners = []
-        self._notifiers = []
-        self._bus_msgs_dicts = {}
-        self._id_display_mode = ID_DISPLAY_MODES[id_display_mode]
-        self._data_display_mode = DATA_DISPLAY_MODES[data_display_mode]
-        self._timestamp_display_mode = TIMESTAMP_DISPLAY_MODES[timestamp_display_mode]
-        self._message_sorting_mode = MESSAGE_SORTING_MODES[message_sorting_mode]
-        self._print_msg_timeout = print_msg_timeout
+        self._busses = busses #a list of python-can busses CANAnalyzer should join
+        self._listeners = [] #a list of listeners used by CANAnalyzer
+        self._notifiers = [] #a list of notifiers used by CANAnalyzer
 
+        #a list of recieved messages ready by CANAnalyzer. each message dictionary within this dictionary
+        #is stored with '<bus>:<message id>' as a key. each message dictionary stores information
+        #about a single message such as the actual message object, a timestamp of the last time
+        #the message was recieved, the time delta between the last two times the message was 
+        #recieved, and if the message was recieved again since the last time it was printed. 
+        self._recv_recv_msgs_dicts = {}
+
+        self._id_display_mode = ID_DISPLAY_MODES[id_display_mode] #mode in which to display ids when printing
+        self._data_display_mode = DATA_DISPLAY_MODES[data_display_mode] #mode in which to display data when printing
+        self._timestamp_display_mode = TIMESTAMP_DISPLAY_MODES[timestamp_display_mode] #mode in which to display timestamps
+        self._message_sorting_mode = MESSAGE_SORTING_MODES[message_sorting_mode] #mode in which to sort messages when printing
+        self._print_msg_timeout = print_msg_timeout #message timeout in sec in which to stop printing the message
+
+        #for each bus that CANAnalyzer should join
         for bus in busses:
-            listener = can.Listener()
-            listener.on_message_received = self._on_msg_recieve
+            listener = can.Listener() #create a lister for the bus
+            listener.on_message_received = self._on_msg_recieve #set the listener's message recieved callback
 
-            notifier = can.Notifier(bus, [listener])
+            notifier = can.Notifier(bus, [listener]) #create a notifier for the bus and add the listener
 
-            self._listeners.append(listener)
-            self._notifiers.append(notifier)
+            self._listeners.append(listener) #add the listener to CANAnalyzer's list of listeners
+            self._notifiers.append(notifier) #add the notifier to CANAnalyzer's list of notifiers
 
-            self._msgs_dicts = {}
+    """
+    CANAnalyzer's callaback for received CAN messages on any bus.
 
+    @param
+    msg: the a python-can CAN message object of the message that was received. passed in from the listener
+    """
     def _on_msg_recieve(self, msg):
 
-        dt = 0.0
-        data_changed = True
+        dt = 0.0 
+        data_changed = True 
 
-        if (msg.channel + ":" + str(msg.arbitration_id)) in self._msgs_dicts:
-            last_recieved_timestamp = self._msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)]['last_recieved_timestamp']
+        #check if the read message is stored in the recieved message dictionary
+        if (msg.channel + ":" + str(msg.arbitration_id)) in self._recv_msgs_dicts:
+
+            #store the timestamp (seconds since epoch) of the previous time the message was recieved
+            last_recieved_timestamp = self._recv_msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)]['last_recieved_timestamp']
+
+            #calculate the delta time (seconds) between the last two times the message was recieved
             dt = msg.timestamp - last_recieved_timestamp
-            last_data = self._msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)]['msg'].data
+
+            #store the data from the last time the message was recieved
+            last_data = self._recv_msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)]['msg'].data
+
+            #TODO: look into moving this into the print messages function. may not want it to update this quickly for display purposes
+            #TODO: this only checks if any of the data has changed, may want to do byte by byte comparison
+            #check if the data in each byte has changed since the last time the message was recieved
             if msg.data == last_data:
                 data_changed = False
         
-        self._msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)] = {'last_recieved_timestamp': msg.timestamp, 'msg': msg, 'last_dt': dt, 'recieved_since_last_print': True,
+        #store the new message information into the recieved message dictionary
+        self._recv_msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)] = {'last_recieved_timestamp': msg.timestamp, 'msg': msg, 'last_dt': dt, 'recieved_since_last_print': True,
             'data_changed': data_changed}
         
-
+    """
+    Prints recieved messages to the terminal
+    """
     def print_data(self):
 
+        #clear the terminal before printing
         self._clear_terminal()
 
+        #print the header
         print('{0}CANAnalyzer{0}'.format('-' * 34))
 
+        #print a newline
         print()
 
+        #print each message, sorted using desired sort order
         for msg_bus_and_id in self._sorted_msgs(3):
             self._print_msg(msg_bus_and_id)
         
                 
+    """
+    Print a single CAN message to the terminal
 
+    @param
+    msg_bus_and_id: the key of the msg to print in the form of '<bus>:<message id>'
+    """
     def _print_msg(self, msg_bus_and_id):
 
-        msg = self._msgs_dicts[msg_bus_and_id]['msg']
-        dt = self._msgs_dicts[msg_bus_and_id]['last_dt']
-        current_time = time.time()
-        time_since_last_recieve = current_time - self._msgs_dicts[msg_bus_and_id]['last_recieved_timestamp']
-        recieved_since_last_print = self._msgs_dicts[msg_bus_and_id]['recieved_since_last_print']
-        data_changed = self._msgs_dicts[msg_bus_and_id]['data_changed']
+        #a python-can CAN message object of the message to print
+        msg = self._recv_msgs_dicts[msg_bus_and_id]['msg'] 
 
+        #the delta time (seconds) between the last two times the message was recieved
+        dt = self._recv_msgs_dicts[msg_bus_and_id]['last_dt']
+
+        #the current time since epoch in seconds
+        current_time = time.time()
+
+        #the time since the last time the message was recieved in seconds
+        time_since_last_recieve = current_time - self._recv_msgs_dicts[msg_bus_and_id]['last_recieved_timestamp']
+
+        #bool storing if the message has been recieved again since it was last printed
+        recieved_since_last_print = self._recv_msgs_dicts[msg_bus_and_id]['recieved_since_last_print']
+
+        #bool storing if the data has changed since the last time it was printed
+        data_changed = self._recv_msgs_dicts[msg_bus_and_id]['data_changed']
+
+        #check to see if the message is past the timeout, if so, dont print it 
         if time_since_last_recieve > self._print_msg_timeout:
             return
 
+        #initialize string that will get printed
         printString = ''
 
+        #if the message has not been recieved since the last time it was printed, grey it out. 
         if not recieved_since_last_print:
             printString = printString + Style.DIM
 
+        #print the message's timestamp in the correct mode:
+        #delta time mode
         if self._timestamp_display_mode == TIMESTAMP_DISPLAY_MODES[1]:
             printString = printString + 'Dt: {0:6.3f}    '.format(dt) #TODO: need to add dt calculations for each id
+        #absolute time mode
         else:
             printString = printString + 'Timestamp: {0:15.3f}    '.format(msg.timestamp)
 
+        #print the bus that the message was recieved on
         printString = printString + 'Bus: {0:5}    '.format(msg.channel)
 
+        #print the message's id in the correct mode:
+        #decimal mode
         if self._id_display_mode == ID_DISPLAY_MODES[1]:
             printString = printString + 'Id: {0:4d}    '.format(msg.arbitration_id)
+        #hex mode
         else:
             printString = printString + 'Id: {0:3X}    '.format(msg.arbitration_id)
 
+        #print the data tag
         printString = printString + 'Data: '
+
+        #print the data in the correct mode:
+        #decimal mode
         if self. _data_display_mode == DATA_DISPLAY_MODES[1]:
+            
+            #print each byte
             for byte in msg.data:
+
+                #if the byte has not changed, grey it out
                 if not data_changed or not recieved_since_last_print:
                     printString = printString + Style.DIM
                 printString = printString + '{0:3d}'.format(byte) + Style.RESET_ALL + " "
-
             printString = printString + '    '
+        #hex mode
         else:
+
+            #print each byte
             for byte in msg.data:
+
+                #if the byte has not changed, grey it out
                 if not data_changed or not recieved_since_last_print:
                     printString = printString + Style.DIM
                 printString = printString + '{0:02X}'.format(byte) + Style.RESET_ALL + " "
             printString = printString + '    '
 
+        #reset the style
         printString = printString + Style.RESET_ALL
 
+        #strip off spaces
         print(printString.strip())
 
-        self._msgs_dicts[msg_bus_and_id]['recieved_since_last_print'] = False
+        #set the recieved since last print bool to false for this message
+        self._recv_msgs_dicts[msg_bus_and_id]['recieved_since_last_print'] = False
 
+    """
+    Sends ASCII code to clear the terminal
+    """
     def _clear_terminal(self):
     
         print('\033[H\033[J') 
 
+    """
+    Sorts messages by given order mode
+
+    @param
+    mode: mode in which to sort the messages
+    """
     def _sorted_msgs(self, mode):
+
+        #default mode: no sorting
         if mode == 0:
-            return self._msgs_dicts
+            return self._recv_msgs_dicts
+
+        #sort by id only
         elif mode == 1:
-            return sorted(self._msgs_dicts, key=lambda msg_bus_and_id: msg_bus_and_id.split(":")[-1])
+            return sorted(self._recv_msgs_dicts, key=lambda msg_bus_and_id: msg_bus_and_id.split(":")[-1])
+
+        #sort by bus only
         elif mode == 2:
-            return sorted(self._msgs_dicts, key=lambda msg_bus_and_id: msg_bus_and_id.split(":")[0])
+            return sorted(self._recv_msgs_dicts, key=lambda msg_bus_and_id: msg_bus_and_id.split(":")[0])
+
+        #sort by bus then id
         elif mode == 3:
-            return sorted(self._msgs_dicts, key=lambda msg_bus_and_id: (msg_bus_and_id.split(":")[0], msg_bus_and_id.split(":")[-1]))
+            return sorted(self._recv_msgs_dicts, key=lambda msg_bus_and_id: (msg_bus_and_id.split(":")[0], msg_bus_and_id.split(":")[-1]))
 
