@@ -44,7 +44,7 @@ class CANAnalyzer():
         #about a single message such as the actual message object, a timestamp of the last time
         #the message was recieved, the time delta between the last two times the message was 
         #recieved, and if the message was recieved again since the last time it was printed. 
-        self._recv_recv_msgs_dicts = {}
+        self._recv_msgs_dicts = {}
 
         self._id_display_mode = ID_DISPLAY_MODES[id_display_mode] #mode in which to display ids when printing
         self._data_display_mode = DATA_DISPLAY_MODES[data_display_mode] #mode in which to display data when printing
@@ -73,6 +73,11 @@ class CANAnalyzer():
         dt = 0.0 
         data_changed = True 
 
+        data_changed = []
+
+        for i in range(8):
+            data_changed.append(False)
+
         #check if the read message is stored in the recieved message dictionary
         if (msg.channel + ":" + str(msg.arbitration_id)) in self._recv_msgs_dicts:
 
@@ -85,11 +90,10 @@ class CANAnalyzer():
             #store the data from the last time the message was recieved
             last_data = self._recv_msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)]['msg'].data
 
-            #TODO: look into moving this into the print messages function. may not want it to update this quickly for display purposes
-            #TODO: this only checks if any of the data has changed, may want to do byte by byte comparison
             #check if the data in each byte has changed since the last time the message was recieved
-            if msg.data == last_data:
-                data_changed = False
+            for i in range(len(msg.data)):
+                if msg.data[i] != last_data[i]:
+                    data_changed[i] = True
         
         #store the new message information into the recieved message dictionary
         self._recv_msgs_dicts[msg.channel + ":" + str(msg.arbitration_id)] = {'last_recieved_timestamp': msg.timestamp, 'msg': msg, 'last_dt': dt, 'recieved_since_last_print': True,
@@ -154,7 +158,7 @@ class CANAnalyzer():
         #print the message's timestamp in the correct mode:
         #delta time mode
         if self._timestamp_display_mode == TIMESTAMP_DISPLAY_MODES[1]:
-            printString = printString + 'Dt: {0:6.3f}    '.format(dt) #TODO: need to add dt calculations for each id
+            printString = printString + 'Dt: {0:6.3f}    '.format(dt)
         #absolute time mode
         else:
             printString = printString + 'Timestamp: {0:15.3f}    '.format(msg.timestamp)
@@ -178,23 +182,23 @@ class CANAnalyzer():
         if self. _data_display_mode == DATA_DISPLAY_MODES[1]:
             
             #print each byte
-            for byte in msg.data:
+            for i in range(len(msg.data)):
 
                 #if the byte has not changed, grey it out
-                if not data_changed or not recieved_since_last_print:
+                if not data_changed[i] or not recieved_since_last_print:
                     printString = printString + Style.DIM
-                printString = printString + '{0:3d}'.format(byte) + Style.RESET_ALL + " "
+                printString = printString + '{0:3d}'.format(msg.data[i]) + Style.RESET_ALL + " "
             printString = printString + '    '
         #hex mode
         else:
 
             #print each byte
-            for byte in msg.data:
+            for i in range(len(msg.data)):
 
                 #if the byte has not changed, grey it out
-                if not data_changed or not recieved_since_last_print:
+                if not data_changed[i] or not recieved_since_last_print:
                     printString = printString + Style.DIM
-                printString = printString + '{0:02X}'.format(byte) + Style.RESET_ALL + " "
+                printString = printString + '{0:02X}'.format(msg.data[i]) + Style.RESET_ALL + " "
             printString = printString + '    '
 
         #reset the style
