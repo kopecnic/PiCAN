@@ -1,5 +1,28 @@
 .box {
-    padding: 10px;
-    border: 3px solid black;
-    margin: 5px;
-  }
+  padding: 10px;
+  border: 5px solid black;
+  margin: 5px;
+}
+
+.can_data_table {
+  font-family: 'Courier New', monospace;
+  width: 100%;
+  border: 3px solid black;
+}
+
+.can_data_td {
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 4px;
+}
+
+.can_data_th {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 2pt solid black;
+  font-weight: 900;
+}
+
+.can_data_tr:nth-child(even) {
+  background-color: #dddddd;
+}

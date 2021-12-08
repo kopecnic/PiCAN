@@ -1,6 +1,7 @@
 import datetime
 import time
 import can
+import re
 from colorama import Fore, Back, Style
 
 #constants
@@ -113,18 +114,70 @@ class CANAnalyzer():
         #print a newline
         print()
 
-        #print each message, sorted using desired sort order
-        for msg_bus_and_id in self._sorted_msgs(3):
-            self._print_msg(msg_bus_and_id)
-        
-                
-    """
-    Print a single CAN message to the terminal
+        print(self._get_print_msg_table_header(self))
 
-    @param
-    msg_bus_and_id: the key of the msg to print in the form of '<bus>:<message id>'
-    """
-    def _print_msg(self, msg_bus_and_id):
+        #print each message, sorted using desired sort order
+        #for msg_bus_and_id in self._sorted_msgs(3):
+        #    print(self._get_print_msg_str(msg_bus_and_id))
+
+    def get_web_print_data_string(self):
+        print_data = []
+
+        for msg_bus_and_id in self._sorted_msgs(3):
+            print_data_string = self._get_print_msg_str(msg_bus_and_id)
+
+            reaesc = re.compile(r'\x1b[^m]*m')
+            print_data_string = reaesc.sub('', print_data_string)
+
+            print_data.append(print_data_string)
+            
+        return print_data
+
+    def get_web_print_data_table(self):
+        print_data = []
+
+        for msg_bus_and_id in self._sorted_msgs(3):
+
+            data = self.get_web_print_table_data(msg_bus_and_id)
+            if data:
+                print_data.append(data)
+
+        return print_data
+        
+
+    def get_web_print_table_headers(self):
+        print_data = {}
+
+        print_data['bus'] = 'BUS'
+
+        #delta time mode
+        if self._timestamp_display_mode == TIMESTAMP_DISPLAY_MODES[1]:
+            print_data['time'] = 'TIME (Dt)'
+        #absolute time mode
+        else:
+            print_data['time'] = 'TIME (Absolute)'
+
+        #decimal mode
+        if self._id_display_mode == ID_DISPLAY_MODES[1]:
+            print_data['id'] = 'ID (dec)'
+        #hex mode
+        else:
+            print_data['id'] = 'ID (hex)'
+
+        #decimal mode
+        if self. _data_display_mode == DATA_DISPLAY_MODES[1]:
+            print_data['data'] = 'DATA (dec)'
+        #hex mode
+        else:
+            print_data['data'] = 'DATA (hex)'
+
+        return print_data
+
+        
+
+    def get_web_print_table_data(self, msg_bus_and_id):
+
+        print_data = {}
 
         #a python-can CAN message object of the message to print
         msg = self._recv_msgs_dicts[msg_bus_and_id]['msg'] 
@@ -146,7 +199,105 @@ class CANAnalyzer():
 
         #check to see if the message is past the timeout, if so, dont print it 
         if time_since_last_recieve > self._print_msg_timeout:
-            return
+            return {}
+
+        print_data['recieved_since_last_print'] = recieved_since_last_print
+
+        #delta time mode
+        if self._timestamp_display_mode == TIMESTAMP_DISPLAY_MODES[1]:
+           print_data['timestamp'] = '{0:06.3f}'.format(dt)
+        #absolute time mode
+        else:
+            print_data['timestamp'] = 'T{0:15.3f}'.format(msg.timestamp)
+
+
+        print_data['bus'] = '{0:5}'.format(msg.channel)
+
+        #decimal mode
+        if self._id_display_mode == ID_DISPLAY_MODES[1]:
+            print_data['id'] = '{0:4d}'.format(msg.arbitration_id)
+        #hex mode
+        else:
+            print_data['id'] = '{0:3X}'.format(msg.arbitration_id)
+
+
+        #decimal mode
+        if self. _data_display_mode == DATA_DISPLAY_MODES[1]:
+
+            data_bytes = []
+            
+            #print each byte
+            for i in range(len(msg.data)):
+
+                data = []
+
+                #if the byte has not changed, grey it out
+                if not data_changed[i] or not recieved_since_last_print:
+                    data.append(False)
+                else:
+                    data.append(True)
+
+                data.append = '{0:3d}'.format(msg.data[i])
+
+                data_bytes.append(data)
+
+        #hex mode
+        else:
+
+            data_bytes = []
+            
+            #print each byte
+            for i in range(len(msg.data)):
+
+                data = []
+
+                #if the byte has not changed, grey it out
+                if not data_changed[i] or not recieved_since_last_print:
+                    data.append(False)
+                else:
+                    data.append(True)
+
+                data.append('{0:02X}'.format(msg.data[i]))
+
+                data_bytes.append(data)  
+
+        print_data['data'] = data_bytes
+
+
+        #set the recieved since last print bool to false for this message
+        self._recv_msgs_dicts[msg_bus_and_id]['recieved_since_last_print'] = False
+
+        return print_data
+                
+    """
+    Print a single CAN message to the terminal
+
+    @param
+    msg_bus_and_id: the key of the msg to print in the form of '<bus>:<message id>'
+    """
+    def _get_print_msg_str(self, msg_bus_and_id):
+
+        #a python-can CAN message object of the message to print
+        msg = self._recv_msgs_dicts[msg_bus_and_id]['msg'] 
+
+        #the delta time (seconds) between the last two times the message was recieved
+        dt = self._recv_msgs_dicts[msg_bus_and_id]['last_dt']
+
+        #the current time since epoch in seconds
+        current_time = time.time()
+
+        #the time since the last time the message was recieved in seconds
+        time_since_last_recieve = current_time - self._recv_msgs_dicts[msg_bus_and_id]['last_recieved_timestamp']
+
+        #bool storing if the message has been recieved again since it was last printed
+        recieved_since_last_print = self._recv_msgs_dicts[msg_bus_and_id]['recieved_since_last_print']
+
+        #bool storing if the data has changed since the last time it was printed
+        data_changed = self._recv_msgs_dicts[msg_bus_and_id]['data_changed']
+
+        #check to see if the message is past the timeout, if so, dont print it 
+        if time_since_last_recieve > self._print_msg_timeout:
+            return ''
 
         #initialize string that will get printed
         printString = ''
@@ -158,7 +309,7 @@ class CANAnalyzer():
         #print the message's timestamp in the correct mode:
         #delta time mode
         if self._timestamp_display_mode == TIMESTAMP_DISPLAY_MODES[1]:
-            printString = printString + 'Dt: {0:6.3f}    '.format(dt)
+            printString = printString + 'Dt: {0:06.3f}    '.format(dt)
         #absolute time mode
         else:
             printString = printString + 'Timestamp: {0:15.3f}    '.format(msg.timestamp)
@@ -204,11 +355,11 @@ class CANAnalyzer():
         #reset the style
         printString = printString + Style.RESET_ALL
 
-        #strip off spaces
-        print(printString.strip())
-
         #set the recieved since last print bool to false for this message
         self._recv_msgs_dicts[msg_bus_and_id]['recieved_since_last_print'] = False
+
+        #strip off spaces
+        return printString.strip()
 
     """
     Sends ASCII code to clear the terminal

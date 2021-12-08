@@ -15,7 +15,7 @@
   <div class="container" style="display: flex">
     <div class="box" style="width: 50%; flex-grow: 1; height: 500px;">
       <div id="test_id" style="text-align:center;"></div>
-      <div id="can_data" style="text-align:left;"></div>
+      <table class="can_data_table" id="can_data_table"></table>
     </div>
   </div>
 
@@ -48,22 +48,62 @@
     {
       socket.emit('display_test');
 
-      setTimeout(test, 1000);
+      setTimeout(test, 500);
     }
 
     socket.on('test_response', function(data)
     {
       document.getElementById("test_id").innerHTML=data["time"] + ":" + data["text"];
-      var canData=data['canData'];
+      
+      var tableHeaders=data['tableHeaders'];
+      var tableData=data['tableData'];
 
-      var printText = "";
+      var tableHeadersHTML = "";
 
-      for(i=0; i<canData.length; i++)
+      tableHeadersHTML = tableHeadersHTML + '<tr class="can_data_tr">'
+      tableHeadersHTML = tableHeadersHTML + '<th class="can_data_th">' + tableHeaders['time'] + '</th>'
+      tableHeadersHTML = tableHeadersHTML + '<th class="can_data_th">' + tableHeaders['bus'] + '</th>'
+      tableHeadersHTML = tableHeadersHTML + '<th class="can_data_th">' + tableHeaders['id'] + '</th>'
+      tableHeadersHTML = tableHeadersHTML + '<th class="can_data_th">' + tableHeaders['data'] + '</th>'
+      tableHeadersHTML = tableHeadersHTML + '<tr>'
+
+      for(i=0; i<tableData.length; i++)
       {
-        printText = printText+canData[i]+'<br>';
+        var textColor = 'black';
+
+        if(tableData[i]['recieved_since_last_print'])
+        {
+          textColor = 'black'
+        }
+        else
+        {
+          textColor = '#aaaaaa'
+        }
+
+        tableHeadersHTML = tableHeadersHTML + '<tr class="can_data_tr">'
+        tableHeadersHTML = tableHeadersHTML + '<td class="can_data_td">' + '<font color=' + textColor + '>' + tableData[i]['timestamp'] + '</font>' + '</td>'
+        tableHeadersHTML = tableHeadersHTML + '<td class="can_data_td">' + '<font color=' + textColor + '>' + tableData[i]['bus'] + '</font>' + '</td>'
+        tableHeadersHTML = tableHeadersHTML + '<td class="can_data_td">' + '<font color=' + textColor + '>' + tableData[i]['id'] + '</font>' + '</td>'
+
+        tableHeadersHTML = tableHeadersHTML + '<td class="can_data_td">'
+        for(j=0; j<tableData[i]['data'].length; j++)
+        {
+          if(tableData[i]['data'][j][0])
+          {
+            tableHeadersHTML = tableHeadersHTML + '<font color=black>' + tableData[i]['data'][j][1] + ' ' + '</font>'
+          }
+          else
+          {
+            tableHeadersHTML = tableHeadersHTML + '<font color=#AAAAAA>' + tableData[i]['data'][j][1] + ' ' + '</font>'
+          }
+          
+        }
+        tableHeadersHTML = tableHeadersHTML + '</td>'
+
+        tableHeadersHTML = tableHeadersHTML + '<tr>'
       }
 
-      document.getElementById("can_data").innerHTML=printText;
+      document.getElementById("can_data_table").innerHTML=tableHeadersHTML;
       
     });
 
