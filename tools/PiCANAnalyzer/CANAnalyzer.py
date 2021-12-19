@@ -114,11 +114,11 @@ class CANAnalyzer():
         #print a newline
         print()
 
-        print(self._get_print_msg_table_header(self))
+       #print(self._get_print_msg_table_header(self))
 
         #print each message, sorted using desired sort order
-        #for msg_bus_and_id in self._sorted_msgs(3):
-        #    print(self._get_print_msg_str(msg_bus_and_id))
+        for msg_bus_and_id in self._sorted_msgs(3):
+            print(self._get_print_msg_str(msg_bus_and_id))
 
     def get_web_print_data_string(self):
         print_data = []
