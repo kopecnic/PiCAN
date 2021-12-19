@@ -29,6 +29,7 @@ class OBD2_ECU_Emulator():
     def _on_msg_recieve(self, msg):
 
         id = msg.arbitration_id
+        id = OBD2_MSG_ID
         data = list(msg.data)
 
         decoded_msg = self._database.decode_message(id, data)                

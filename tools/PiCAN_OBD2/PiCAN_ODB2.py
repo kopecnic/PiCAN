@@ -1,13 +1,16 @@
 import can
 import cantools
 import time
+import copy
 
 #TODO: Thread protect dictionaries
 #TODO: Make all data print at once
 
 OBD2_DBC_FILEPATH = "CSS-Electronics-OBD2-v1.4.dbc"
-OBD2_MSG_ID = 2024
+OBD2_MSG_ID_RX = 2024
 OBD2_MSG_ID_TX = 2015
+OBD2_SUPPORTED_IDS_TX_RATE = 0.5
+
 
 class PiCAN_OBD2():
     def __init__(
@@ -58,26 +61,30 @@ class PiCAN_OBD2():
 
             #self._print_decoded_msg(decoded_msg)
 
-            if id == OBD2_MSG_ID:
+            if id == OBD2_MSG_ID_RX:
                 self._process_OBD2_data_msg(decoded_msg)
 
     def _get_supported_pids_service01(self):
 
         print("Getting supported PIDs...")
 
-        msg = can.Message(arbitration_id=OBD2_MSG_ID)
+        data = [2, 1, 0, 0, 0, 0, 0, 0]
+        msg = can.Message(arbitration_id=OBD2_MSG_ID_TX, is_extended_id=False, data = data)
+        task = self._bus.send_periodic(msg, OBD2_SUPPORTED_IDS_TX_RATE)
 
         while not self._received_supported_PIDs_service01_01_20:
-            data = [2, 1, 0, 0, 0, 0, 0, 0]
-            msg = can.Message(arbitration_id=0x7DF, is_extended_id=False, data = data)
-            self._bus.send(msg)
             time.sleep(.2)
+        
+        task.stop()
+
+        data = [2, 1, 32, 0, 0, 0, 0, 0]
+        msg = can.Message(arbitration_id=OBD2_MSG_ID_TX, is_extended_id=False, data = data)
+        task = self._bus.send_periodic(msg, OBD2_SUPPORTED_IDS_TX_RATE)
 
         while not self._received_supported_PIDs_service01_21_40:
-            data = [2, 1, 32, 0, 0, 0, 0, 0]
-            msg = can.Message(arbitration_id=OBD2_MSG_ID_TX, is_extended_id=False, data = data)
-            self._bus.send(msg)
             time.sleep(.2)
+        
+        task.stop()
             
         """
         while not self._received_supported_PIDs_service01_41_60:
@@ -111,12 +118,17 @@ class PiCAN_OBD2():
             time.sleep(.2)
             
         """
-
+        
+        pids_service01 = [0, 32, 64, 96, 128, 160, 192]
+        
+        for pid in pids_service01:
+            self._supported_pids_service01[pid] = 0
+            
         print(self._supported_pids_service01)
 
     def request_data(self):
     
-        supported_pids_service01 = self._supported_pids_service01
+        supported_pids_service01 = copy.deepcopy(self._supported_pids_service01)
 
         for pid in supported_pids_service01:
             if supported_pids_service01[pid] == '1':
@@ -225,7 +237,7 @@ class PiCAN_OBD2():
                     for key in decoded_msg.keys():
                         if key not in excluded_sigs:
                             self._obd2_data[key] = decoded_msg[key]
-                            print(key)
+                            #print(key)
 
         except KeyError:
             print("There was a KeyError!")
@@ -239,10 +251,10 @@ class PiCAN_OBD2():
 
         print('{0}'.format('-' * 80))
         
-        keys = self._obd2_data.keys()
-
-        for key in keys:
-            print(key, ": ", self._obd2_data[key])
+        obd2_data = copy.deepcopy(self._obd2_data)
+        
+        for key in obd2_data.keys():
+            print(key, ": ", obd2_data[key])
 
         print('{0}'.format('-' * 80))
 
@@ -272,11 +284,11 @@ class PiCAN_OBD2():
 
 if __name__ == '__main__':
 
-    bus0 = can.interface.Bus(bustype='socketcan', channel='can0', bitrate=500000) #setup bus 1
+    bus0 = can.ThreadSafeBus(bustype='socketcan', channel='can0', bitrate=500000) #setup bus 1
     obd_dbc = cantools.database.load_file(OBD2_DBC_FILEPATH)
     obd2_interface = PiCAN_OBD2(bus0, obd_dbc)
 
     while(1):
         obd2_interface.print_OBD2_data()
-        time.sleep(1)
+        time.sleep(0.2)
         obd2_interface.request_data()

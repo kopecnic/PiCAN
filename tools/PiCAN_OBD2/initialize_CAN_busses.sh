@@ -12,3 +12,5 @@ sudo ifconfig can0 txqueuelen 65536
 sudo ifconfig can1 txqueuelen 65536
 
 echo Done.
+
+ifconfig
