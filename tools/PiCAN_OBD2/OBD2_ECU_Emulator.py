@@ -19,8 +19,6 @@ class OBD2_ECU_Emulator():
         for message in self._database.messages:
             self._database_msg_ids.append(message.frame_id)
 
-        print(self._database_msg_ids)
-
         self._listener = can.Listener()
         self._listener.on_message_received = self._on_msg_recieve
 
@@ -32,7 +30,10 @@ class OBD2_ECU_Emulator():
         id = OBD2_MSG_ID
         data = list(msg.data)
 
-        decoded_msg = self._database.decode_message(id, data)                
+        try:
+            decoded_msg = self._database.decode_message(id, data)   
+        except:
+            return
 
         if id in self._database_msg_ids:
 
@@ -43,8 +44,6 @@ class OBD2_ECU_Emulator():
                     if decoded_msg['service'] == 'Show current data ':
 
                         if decoded_msg['ParameterID_Service01'] == 'S1_PID_00_PIDsSupported_01_20':
-
-                            print("Message Recieved3")
 
                             data = [2, 1, 0, 170, 170, 170, 170, 0]
                             msg = can.Message(arbitration_id=OBD2_MSG_ID, data = data)
