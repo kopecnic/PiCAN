@@ -1,7 +1,12 @@
+import argparse
 import can
 import cantools
 import time
 import copy
+from threading import Thread
+from influxdb_client import InfluxDBClient, Point
+from influxdb_client.client.write_api import SYNCHRONOUS
+import datetime
 
 #TODO: Thread protect dictionaries
 #TODO: Make all data print at once
@@ -77,6 +82,11 @@ class PiCAN_OBD2():
 
         self._notifier = can.Notifier(self._bus, [self._listener])
 
+        self._log_to_influx = False
+        self._influx_bucket = ''
+        self._influx_client = None
+        self.influx_write_client = None
+
         self._obd2_data = {}
 
         self._service01_pids_supported_pids = SERVICE01_PIDS_SUPPORTED_PIDS
@@ -86,10 +96,12 @@ class PiCAN_OBD2():
         self._get_supported_pids_service01()
 
 
+
     def _on_msg_recieve(self, msg):
 
         id = msg.arbitration_id
         data = msg.data
+        timestamp = msg.timestamp
 
         if id in self._database_msg_ids:
 
@@ -100,7 +112,26 @@ class PiCAN_OBD2():
               return
 
             if id == OBD2_MSG_ID_RX:
-                self._process_OBD2_data_msg(decoded_msg)
+                self._process_OBD2_data_msg(decoded_msg, timestamp)
+
+    def enable_influx_logging(self, url, org, token, bucket):
+
+        try:
+
+            self._influx_bucket = bucket
+
+            self._influx_client = InfluxDBClient(url=url, token=token, org=org, debug=False)
+
+            self.influx_write_client = self._influx_client.write_api(write_options=SYNCHRONOUS)
+
+            self._log_to_influx = True
+
+        except:
+            self._log_to_influx = False
+            print("Could not enable influx logging!!")
+            return False
+
+        return True
 
     def _get_supported_pids_service01(self):
 
@@ -144,7 +175,7 @@ class PiCAN_OBD2():
     """
     Process a recieved OBD2 message. Stores recieved data in the self._obd2_data dictionary
     """
-    def _process_OBD2_data_msg(self, decoded_msg):
+    def _process_OBD2_data_msg(self, decoded_msg, timestamp):
         excluded_sigs = [
             "length",
             "response",
@@ -163,7 +194,7 @@ class PiCAN_OBD2():
 
                     print("Service Group 01 - 20 Recieved")
 
-                    pids_supported = list(bin(decoded_msg['S1_PID_00_PIDsSupported_01_20']))[2:]
+                    pids_supported = list("{:032b}".format(decoded_msg['S1_PID_00_PIDsSupported_01_20']))
 
                     for i in range(0, len(pids_supported)):
                         self._supported_pids_service01[i+1] = pids_supported[i]
@@ -175,7 +206,7 @@ class PiCAN_OBD2():
 
                     print("Service Group 21 - 40 Recieved")
 
-                    pids_supported = list(bin(decoded_msg['S1_PID_20_PIDsSupported_21_40']))[2:]
+                    pids_supported = list("{:032b}".format(decoded_msg['S1_PID_20_PIDsSupported_21_40']))
 
                     for i in range(0, len(pids_supported)):
                         self._supported_pids_service01[i+33] = pids_supported[i]
@@ -186,7 +217,7 @@ class PiCAN_OBD2():
 
                     print("Service Group 41 - 60 Recieved")
 
-                    pids_supported = list(bin(decoded_msg['S1_PID_40_PIDsSupported_41_60']))[2:]
+                    pids_supported = list("{:032b}".format(decoded_msg['S1_PID_40_PIDsSupported_41_60']))
 
                     for i in range(0, len(pids_supported)):
                         self._supported_pids_service01[i+65] = pids_supported[i]
@@ -197,7 +228,7 @@ class PiCAN_OBD2():
 
                     print("Service Group 61 - 80 Recieved")
 
-                    pids_supported = list(bin(decoded_msg['S1_PID_60_PIDsSupported_61_80']))[2:]
+                    pids_supported = list("{:032b}".format(decoded_msg['S1_PID_60_PIDsSupported_61_80']))
 
                     for i in range(0, len(pids_supported)):
                         self._supported_pids_service01[i+97] = pids_supported[i]
@@ -208,7 +239,7 @@ class PiCAN_OBD2():
 
                     print("Service Group 81 - A0 Recieved")
 
-                    pids_supported = list(bin(decoded_msg['S1_PID_80_PIDsSupported_81_A0']))[2:]
+                    pids_supported = list("{:032b}".format(decoded_msg['S1_PID_80_PIDsSupported_81_A0']))
 
                     for i in range(0, len(pids_supported)):
                         self._supported_pids_service01[i+129] = pids_supported[i]
@@ -219,7 +250,7 @@ class PiCAN_OBD2():
 
                     print("Service Group A1 - C0 Recieved")
 
-                    pids_supported = list(bin(decoded_msg['S1_PID_A0_PIDsSupported_A1_C0']))[2:]
+                    pids_supported = list("{:032b}".format(decoded_msg['S1_PID_A0_PIDsSupported_A1_C0']))
 
                     for i in range(0, len(pids_supported)):
                         self._supported_pids_service01[i+161] = pids_supported[i]
@@ -230,7 +261,7 @@ class PiCAN_OBD2():
 
                     print("Service Group C1 - E0 Recieved")
 
-                    pids_supported = list(bin(decoded_msg['S1_PID_C0_PIDsSupported_C1_E0']))[2:]
+                    pids_supported = list("{:032b}".format(decoded_msg['S1_PID_C0_PIDsSupported_C1_E0']))
 
                     for i in range(0, len(pids_supported)):
                         self._supported_pids_service01[i+193] = pids_supported[i]
@@ -239,10 +270,21 @@ class PiCAN_OBD2():
                     for key in decoded_msg.keys():
                         if key not in excluded_sigs:
                             self._obd2_data[key] = decoded_msg[key]
-                            #print(key)
+                            if self._log_to_influx:
+                                thread = Thread(target = self._write_obd2_data_to_influx, args = (key, decoded_msg[key], timestamp))
+                                thread.start()
 
         except KeyError:
             print("There was a KeyError!")
+
+    def _write_obd2_data_to_influx(self, field_name, field_data, timestamp):
+        try:
+          #print("Logging", field_name, "to influx!")
+          obd2_data_point = Point("TEST_VEHICLE").field(field_name, field_data).time(datetime.datetime.utcfromtimestamp(timestamp))
+          self.influx_write_client.write(bucket=self._influx_bucket, record=obd2_data_point)
+        except:
+          return
+        return
 
     """
     Prints all the stored OBD data
@@ -298,14 +340,43 @@ class PiCAN_OBD2():
     
         print('\033[H\033[J') 
 
-if __name__ == '__main__':
+def main():
+
+    parser = argparse.ArgumentParser()
+
+    subparsers = parser.add_subparsers()
+
+    log_parser = subparsers.add_parser('log')
+
+    log_subparser = log_parser.add_subparsers(dest='logging_type')
+
+    sd_log_subparser = log_subparser.add_parser('sd')
+
+    influx_log_subparser = log_subparser.add_parser('influx')
+
+    influx_log_subparser.add_argument("url")
+    influx_log_subparser.add_argument("org")
+    influx_log_subparser.add_argument("token")
+    influx_log_subparser.add_argument("bucket")
+
+    args = parser.parse_args()
+
+    print(args)
 
     bus0 = can.ThreadSafeBus(bustype='socketcan', channel='can0', bitrate=500000) #setup bus 1
     obd_dbc = cantools.database.load_file(OBD2_DBC_FILEPATH)
     obd2_interface = PiCAN_OBD2(bus0, obd_dbc)
 
+    if "logging_type" in vars(args).keys():
+        
+        if args.logging_type == "influx":
+            obd2_interface.enable_influx_logging(args.url, args.org, args.token, args.bucket)
+
     while(1):
-        obd2_interface.print_all_OBD2_data()
+        #obd2_interface.print_all_OBD2_data()
         #obd2_interface.print_select_OBD2_data(SELECTED_PRINT_DATA_SERVICE01)
         time.sleep(0.2)
         obd2_interface.request_data()
+
+if __name__ == '__main__':
+    main()
