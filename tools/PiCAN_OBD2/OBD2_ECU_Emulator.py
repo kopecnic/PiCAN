@@ -27,6 +27,8 @@ class OBD2_ECU_Emulator():
 
     def _on_msg_recieve(self, msg):
 
+        
+
         id = msg.arbitration_id
         id = OBD2_MSG_ID
         data = list(msg.data)
@@ -45,10 +47,11 @@ class OBD2_ECU_Emulator():
                     if decoded_msg['service'] == 'Show current data ':
 
                         if decoded_msg['ParameterID_Service01'] == 'S1_PID_00_PIDsSupported_01_20':
-
+                            
                             data = [2, 1, 0, 8, 0, 0, 0, 0]
                             msg = can.Message(arbitration_id=OBD2_MSG_ID, data = data)
                             self._bus.send(msg)
+
 
                         elif decoded_msg['ParameterID_Service01'] == 'S1_PID_20_PIDsSupported_21_40':
                             
@@ -98,7 +101,7 @@ class OBD2_ECU_Emulator():
 if __name__ == '__main__':
 
     bus1 = can.interface.Bus(bustype='socketcan', channel='can1', bitrate=500000) #setup bus 1
-    obd_dbc = cantools.database.load_file(OBD2_DBC_FILEPATH)
+    obd_dbc = cantools.database.load_file(OBD2_DBC_FILEPATH, database_format='dbc', encoding='cp1252')
     obd_ecu_emulator = OBD2_ECU_Emulator(bus1, obd_dbc)
 
     while(1):

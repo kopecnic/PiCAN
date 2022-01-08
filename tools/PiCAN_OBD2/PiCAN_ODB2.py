@@ -108,7 +108,6 @@ class PiCAN_OBD2():
             try:
               decoded_msg = self._database.decode_message(id, data)
             except:
-              #print("THERE WAS AN EXCEPTION")
               return
 
             if id == OBD2_MSG_ID_RX:
@@ -375,7 +374,7 @@ def main():
     while(1):
         #obd2_interface.print_all_OBD2_data()
         #obd2_interface.print_select_OBD2_data(SELECTED_PRINT_DATA_SERVICE01)
-        time.sleep(0.2)
+        time.sleep(0.1)
         obd2_interface.request_data()
 
 if __name__ == '__main__':
