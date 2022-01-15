@@ -50,7 +50,7 @@ class PiCANLogger():
             except:
               return
 
-            print(decoded_msg)
+            self._process_decoded_message(decoded_msg, timestamp)
 
 
     def enable_influx_logging(self, url, org, token, bucket):
@@ -72,10 +72,17 @@ class PiCANLogger():
 
         return True
 
-    def _write_obd2_data_to_influx(self, field_name, field_data, timestamp):
+    def _process_decoded_message(self, decoded_msg, timestamp):
+
+        for key in decoded_msg.keys():
+            if self._log_to_influx:
+                thread = Thread(target = self._write_data_to_influx, args = (key, decoded_msg[key], timestamp))
+                thread.start()
+
+    def _write_data_to_influx(self, field_name, field_data, timestamp):
         try:
           #print("Logging", field_name, "to influx!")
-          obd2_data_point = Point("TEST_VEHICLE").field(field_name, field_data).time(datetime.datetime.utcfromtimestamp(timestamp))
+          obd2_data_point = Point("LOGGER_TEST").field(field_name, field_data).time(datetime.datetime.utcfromtimestamp(timestamp))
           self.influx_write_client.write(bucket=self._influx_bucket, record=obd2_data_point)
         except:
           return
